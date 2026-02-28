@@ -14,4 +14,5 @@ def test_mcp_info_available() -> None:
     response = client.get("/v1/mcp/info")
     assert response.status_code == 200
     payload = response.json()
+    assert "ensure_project" in payload["tools"]
     assert "search_docs" in payload["tools"]

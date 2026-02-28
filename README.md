@@ -39,6 +39,7 @@ uv run python -m app.main
 
 ## FastMCP tools
 
+- `ensure_project`
 - `search_docs`
 - `store_memory`
 - `search_memory`

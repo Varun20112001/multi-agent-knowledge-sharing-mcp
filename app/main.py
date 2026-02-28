@@ -97,7 +97,10 @@ def verify_memory_endpoint(
 
 @app.get("/v1/mcp/info")
 def mcp_info() -> dict[str, object]:
-    return {"server": "fastmcp", "tools": ["search_docs", "store_memory", "search_memory", "verify_memory"]}
+    return {
+        "server": "fastmcp",
+        "tools": ["ensure_project", "search_docs", "store_memory", "search_memory", "verify_memory"],
+    }
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy import select
 
 from app.db.engine import SessionLocal
-from app.db.models import IngestionRun, Memory
+from app.db.models import IngestionRun, Memory, Project
 from app.embeddings.router import get_embedding_provider
 from app.ingestion.loader import get_head_commit_sha
 from app.memory.service import MemoryValidationError, search_memory, store_memory, verify_memory
@@ -26,6 +26,36 @@ def register_mcp_tools(
         port=port,
         streamable_http_path=streamable_http_path,
     )
+
+    @mcp.tool(
+        name="ensure_project",
+        description="Create (or reuse) a project record from a repository name and return its project_id. Idempotent for the same normalized name.",
+    )
+    def ensure_project(repo_name: str) -> dict[str, object]:
+        normalized_name = repo_name.strip().replace("\\", "/").rstrip("/")
+        if not normalized_name:
+            return {"status": "error", "error": "repo_name must not be empty"}
+
+        with SessionLocal() as db:
+            existing = db.execute(
+                select(Project).where(Project.name == normalized_name)
+            ).scalar_one_or_none()
+            if existing is not None:
+                return {
+                    "project_id": str(existing.id),
+                    "project_name": existing.name,
+                    "created": False,
+                }
+
+            project = Project(name=normalized_name)
+            db.add(project)
+            db.commit()
+            db.refresh(project)
+            return {
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "created": True,
+            }
 
     @mcp.tool(
         name="search_docs",
