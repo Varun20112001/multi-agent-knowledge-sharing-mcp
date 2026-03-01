@@ -221,13 +221,21 @@ def register_mcp_tools(
         ] = None,
         language: Annotated[str | None, Field(description="Optional language filter")] = None,
         commit_sha: Annotated[str | None, Field(description="Optional commit SHA filter")] = None,
-    ) -> list[dict[str, object]]:
+        cursor: Annotated[
+            str | None,
+            Field(description="Opaque pagination cursor from a previous search_docs response"),
+        ] = None,
+        candidate_pool_size: Annotated[
+            int | None,
+            Field(description="Optional candidate pool size for vector/lexical CTEs", ge=20, le=1000),
+        ] = None,
+    ) -> dict[str, object]:
         pid = UUID(project_id)
         embedder = get_embedding_provider()
         query_embedding = embedder.embed([query])[0]
 
         with SessionLocal() as db:
-            rows = hybrid_search(
+            page = hybrid_search(
                 db=db,
                 project_id=pid,
                 query=query,
@@ -236,8 +244,23 @@ def register_mcp_tools(
                 file_path_prefix=file_path_prefix,
                 language=language,
                 commit_sha=commit_sha,
+                cursor=cursor,
+                candidate_pool_size=candidate_pool_size,
             )
-            return [row.__dict__ for row in rows]
+            return {
+                "items": [
+                    {
+                        "file_path": row.file_path,
+                        "start_line": row.start_line,
+                        "end_line": row.end_line,
+                        "commit_sha": row.commit_sha,
+                        "score": row.score,
+                        "chunk_text": row.chunk_text,
+                    }
+                    for row in page.items
+                ],
+                "next_cursor": page.next_cursor,
+            }
 
     @mcp.tool(
         name="store_memory",
