@@ -76,6 +76,9 @@ def ingest_status(
         status=run.status,
         files_scanned=run.files_scanned,
         chunks_written=run.chunks_written,
+        files_changed=run.files_changed,
+        chunks_upserted=run.chunks_upserted,
+        chunks_deactivated=run.chunks_deactivated,
         error=run.error,
     )
 

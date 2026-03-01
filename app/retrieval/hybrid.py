@@ -35,7 +35,7 @@ def reciprocal_rank_fusion(rank: int, k: int = 60) -> float:
 
 
 def _build_chunk_query(project_id: UUID, file_path_prefix: str | None, language: str | None) -> Select[tuple[RepoChunk]]:
-    stmt = select(RepoChunk).where(RepoChunk.project_id == project_id)
+    stmt = select(RepoChunk).where(RepoChunk.project_id == project_id, RepoChunk.is_active.is_(True))
     if file_path_prefix:
         stmt = stmt.where(RepoChunk.file_path.like(f"{file_path_prefix}%"))
     if language:

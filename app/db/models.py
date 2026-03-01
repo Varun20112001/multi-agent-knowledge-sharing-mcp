@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Index,
     func,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
@@ -54,6 +55,10 @@ class ApiKey(Base):
 
 class RepoChunk(Base):
     __tablename__ = "repo_chunks"
+    __table_args__ = (
+        UniqueConstraint("project_id", "chunk_hash", name="uq_repo_chunks_project_chunk_hash"),
+        Index("ix_repo_chunks_project_active", "project_id", "is_active"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -63,10 +68,14 @@ class RepoChunk(Base):
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     language: Mapped[str] = mapped_column(String(64), nullable=False, default="text")
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     start_line: Mapped[int] = mapped_column(Integer, nullable=False)
     end_line: Mapped[int] = mapped_column(Integer, nullable=False)
     commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    embedding_model: Mapped[str] = mapped_column(String(128), nullable=False, default="unknown")
+    embedding_version: Mapped[str] = mapped_column(String(64), nullable=False, default="v1")
     embedding: Mapped[list[float]] = mapped_column(Vector(settings.embedding_dim), nullable=False)
     tsv: Mapped[str] = mapped_column(TSVECTOR, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -112,10 +121,30 @@ class IngestionRun(Base):
     repo_path: Mapped[str] = mapped_column(Text, nullable=False)
     head_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False)
     files_scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    files_changed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     chunks_written: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_upserted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunks_deactivated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RepoIngestionState(Base):
+    __tablename__ = "repo_ingestion_state"
+    __table_args__ = (
+        UniqueConstraint("project_id", "repo_path", name="uq_repo_ingestion_state_project_repo"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    repo_path: Mapped[str] = mapped_column(Text, nullable=False)
+    last_successful_commit_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
