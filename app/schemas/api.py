@@ -52,7 +52,10 @@ class IngestionStatusResponse(BaseModel):
     ingestion_run_id: UUID
     status: str
     files_scanned: int
+    files_changed: int = 0
     chunks_written: int
+    chunks_upserted: int = 0
+    chunks_deactivated: int = 0
     error: str | None = None
 
 

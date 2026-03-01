@@ -31,7 +31,7 @@ def _normalized_path(raw_path: str) -> str:
 
 def _project_has_chunks(db: Session, project_id: UUID) -> bool:
     return (
-        db.execute(select(RepoChunk.id).where(RepoChunk.project_id == project_id).limit(1)).scalar_one_or_none()
+        db.execute(select(RepoChunk.id).where(RepoChunk.project_id == project_id, RepoChunk.is_active.is_(True)).limit(1)).scalar_one_or_none()
         is not None
     )
 
@@ -42,7 +42,7 @@ def list_project_files(
     prefix: str | None = None,
     limit: int = 200,
 ) -> list[str]:
-    stmt = select(RepoChunk.file_path).where(RepoChunk.project_id == project_id).distinct()
+    stmt = select(RepoChunk.file_path).where(RepoChunk.project_id == project_id, RepoChunk.is_active.is_(True)).distinct()
     rows = [row[0] for row in db.execute(stmt).all()]
 
     if prefix:
@@ -107,6 +107,7 @@ def _resolve_citation(db: Session, project_id: UUID, citation: CitationInput) ->
             RepoChunk.file_path == resolved_path,
             RepoChunk.start_line <= line_start,
             RepoChunk.end_line >= line_start,
+            RepoChunk.is_active.is_(True),
         )
     ).scalar_one_or_none()
 
@@ -246,6 +247,7 @@ def verify_memory(db: Session, project_id: UUID, memory_id: UUID) -> tuple[str, 
                 RepoChunk.file_path == file_path,
                 RepoChunk.start_line <= line_start,
                 RepoChunk.end_line >= line_start,
+                RepoChunk.is_active.is_(True),
             )
         ).scalar_one_or_none()
 
