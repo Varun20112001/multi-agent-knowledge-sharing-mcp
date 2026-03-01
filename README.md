@@ -40,6 +40,10 @@ uv run python -m app.main
 ## FastMCP tools
 
 - `ensure_project`
+- `ingest_repository`
+- `get_ingestion_status`
+- `list_project_files`
+- `validate_citations`
 - `search_docs`
 - `store_memory`
 - `search_memory`
@@ -59,3 +63,25 @@ uv run python -m app.main
 - Set `EMBED_PROVIDER=openai` and `OPENAI_API_KEY` for real embeddings.
 - Keep `EMBEDDING_DIM` at `<=2000` when using HNSW indexes with `pgvector` (default is `1536`).
 - LLM provider routing is implemented (`openai`, `anthropic`, `local` stub).
+
+## Memory Citation Schema
+
+Use this citation shape when calling `store_memory`:
+
+```json
+{
+  "file_path": "orders/apis/assessment_individual_report/create_report.py",
+  "line_start": 1,
+  "line_end": 40,
+  "quote": "optional"
+}
+```
+
+Compatibility input (`url`) is accepted and normalized to `file_path`, but canonical storage always uses `file_path`.
+
+Recommended tool sequence:
+1. `ensure_project`
+2. `ingest_repository` (async default)
+3. `get_ingestion_status` until `status=success`
+4. `list_project_files` / `validate_citations`
+5. `store_memory`

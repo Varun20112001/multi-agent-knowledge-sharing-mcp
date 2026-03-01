@@ -1,12 +1,38 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Citation(BaseModel):
     file_path: str
     line_start: int = Field(ge=1)
     line_end: int | None = Field(default=None, ge=1)
+    quote: str | None = None
+
+    @model_validator(mode="after")
+    def validate_line_range(self) -> "Citation":
+        if self.line_end is not None and self.line_end < self.line_start:
+            raise ValueError("line_end must be >= line_start")
+        return self
+
+
+class CitationInput(BaseModel):
+    file_path: str | None = None
+    url: str | None = None
+    line_start: int | None = Field(default=None, ge=1)
+    line_end: int | None = Field(default=None, ge=1)
+    quote: str | None = None
+    title: str | None = None
+
+    @model_validator(mode="after")
+    def validate_line_range(self) -> "CitationInput":
+        if (
+            self.line_start is not None
+            and self.line_end is not None
+            and self.line_end < self.line_start
+        ):
+            raise ValueError("line_end must be >= line_start")
+        return self
 
 
 class IngestRepoRequest(BaseModel):
@@ -62,7 +88,7 @@ class StoreMemoryRequest(BaseModel):
     subject: str
     fact: str
     reason: str | None = None
-    citations: list[Citation]
+    citations: list[CitationInput]
     confidence: float = Field(default=0.75, ge=0, le=1)
 
 

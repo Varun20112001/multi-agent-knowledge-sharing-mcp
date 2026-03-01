@@ -4,6 +4,50 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+HEAVY_DIR_NAMES = {
+    "node_modules",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".turbo",
+    "target",
+    "out",
+    ".idea",
+    ".vscode",
+}
+
+BINARY_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".7z",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".mp3",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+}
+
 
 @dataclass
 class RepoFile:
@@ -46,6 +90,8 @@ def get_head_commit_sha(repo_path: Path) -> str:
 
 def should_exclude(path: Path, exclude_globs: list[str]) -> bool:
     normalized = path.as_posix()
+    if any(part in HEAVY_DIR_NAMES for part in path.parts):
+        return True
     return any(path.match(pattern) or normalized.endswith(pattern.replace("**/", "")) for pattern in exclude_globs)
 
 
@@ -68,6 +114,8 @@ def load_repo_files(
             if should_exclude(rel, exclude_globs):
                 continue
             if candidate.stat().st_size > max_file_size_kb * 1024:
+                continue
+            if candidate.suffix.lower() in BINARY_EXTENSIONS:
                 continue
             try:
                 content = candidate.read_text(encoding="utf-8")

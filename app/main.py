@@ -99,7 +99,17 @@ def verify_memory_endpoint(
 def mcp_info() -> dict[str, object]:
     return {
         "server": "fastmcp",
-        "tools": ["ensure_project", "search_docs", "store_memory", "search_memory", "verify_memory"],
+        "tools": [
+            "ensure_project",
+            "ingest_repository",
+            "get_ingestion_status",
+            "list_project_files",
+            "validate_citations",
+            "search_docs",
+            "store_memory",
+            "search_memory",
+            "verify_memory",
+        ],
     }
 
 
