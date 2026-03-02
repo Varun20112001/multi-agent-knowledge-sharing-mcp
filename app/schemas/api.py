@@ -104,6 +104,34 @@ class SnippetResponse(BaseModel):
     chunk_text: str
 
 
+class RunRAGRequest(BaseModel):
+    project_id: UUID
+    query: str
+    top_k: int = Field(default=8, ge=1, le=50)
+
+
+class ProviderAttemptTelemetryResponse(BaseModel):
+    provider: str
+    model: str
+    attempt: int
+    latency_ms: float
+    outcome: str
+    error_type: str | None = None
+    error_message: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class RunRAGResponse(BaseModel):
+    answer: str
+    provider: str
+    model: str
+    snippets: list[SnippetResponse]
+    memories: list[dict[str, object]]
+    telemetry: list[ProviderAttemptTelemetryResponse]
+
+
 class MemoryResponse(BaseModel):
     memory_id: UUID
     subject: str
