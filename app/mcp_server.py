@@ -10,6 +10,8 @@ from sqlalchemy import select
 
 from app.db.engine import SessionLocal
 from app.db.models import IngestionRun, Memory, Project
+from app.agents.provider_router import get_llm_provider
+from app.config import get_settings
 from app.embeddings.router import get_embedding_provider
 from app.ingestion.service import create_ingestion_run, execute_ingestion_run, ingest_repository
 from app.memory.service import (
@@ -20,7 +22,8 @@ from app.memory.service import (
     validate_citations,
     verify_memory,
 )
-from app.retrieval.hybrid import hybrid_search
+from app.rag.orchestrator import MemoryService, RAGOrchestrator, Retriever
+from app.retrieval.hybrid import RetrievedSnippet, hybrid_search
 from app.schemas.api import CitationInput, IngestRepoRequest, SearchMemoryRequest, StoreMemoryRequest
 
 _INGESTION_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="mcp-ingestion")
@@ -378,6 +381,72 @@ def register_mcp_tools(
                 "status_before": before,
                 "status_after": after,
                 "checks": checks,
+            }
+
+
+    @mcp.tool(
+        name="run_rag",
+        description="Execute retrieval + memory + LLM generation with provider fallback and telemetry.",
+    )
+    def run_rag_tool(
+        project_id: Annotated[str, Field(description="Project UUID string")],
+        query: Annotated[str, Field(description="Natural language question")],
+        top_k: Annotated[int, Field(description="Number of snippets to retrieve", ge=1, le=50)] = 8,
+    ) -> dict[str, object]:
+        settings = get_settings()
+
+        class MCPRetriever(Retriever):
+            def __init__(self, db_session):
+                self.db = db_session
+                self.embedder = get_embedding_provider()
+
+            def retrieve(self, *, project_id: UUID, query: str, top_k: int) -> list[RetrievedSnippet]:
+                query_embedding = self.embedder.embed([query])[0]
+                page = hybrid_search(self.db, project_id, query, query_embedding, top_k)
+                return page.items
+
+        class MCPMemoryService(MemoryService):
+            def __init__(self, db_session):
+                self.db = db_session
+                self.embedder = get_embedding_provider()
+
+            def recall(self, *, project_id: UUID, query: str, top_k: int) -> list[dict[str, object]]:
+                query_embedding = self.embedder.embed([query])[0]
+                rows = search_memory(self.db, project_id, query, query_embedding, top_k, include_stale=False)
+                return [
+                    {
+                        "memory_id": str(mem.id),
+                        "subject": mem.subject,
+                        "fact": mem.fact,
+                        "citations": mem.citations,
+                        "confidence": float(mem.confidence),
+                        "status": mem.status,
+                    }
+                    for mem in rows
+                ]
+
+        providers = {}
+        for provider_name in settings.provider_execution.provider_priority:
+            try:
+                providers[provider_name] = get_llm_provider(provider_name)
+            except Exception:
+                continue
+
+        with SessionLocal() as db:
+            orchestrator = RAGOrchestrator(
+                retriever=MCPRetriever(db),
+                memory_service=MCPMemoryService(db),
+                providers=providers,
+                execution_config=settings.provider_execution,
+            )
+            result = orchestrator.run(project_id=UUID(project_id), query=query, top_k=top_k)
+            return {
+                "answer": result.answer,
+                "provider": result.provider,
+                "model": result.model,
+                "snippets": [snippet.__dict__ for snippet in result.snippets],
+                "memories": result.memories,
+                "telemetry": [attempt.__dict__ for attempt in result.telemetry],
             }
 
     return mcp
