@@ -17,6 +17,7 @@ dependencies = [
   "anthropic>=0.42.0",
   "python-dotenv>=1.0.1",
   "orjson>=3.10.12",
+  "argon2-cffi>=23.1.0",
 ]
 
 [dependency-groups]

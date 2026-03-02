@@ -1,5 +1,7 @@
-import uuid
+import secrets
+import string
 import sys
+import uuid
 from pathlib import Path
 
 from sqlalchemy import select
@@ -11,11 +13,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from app.db.engine import SessionLocal
 from app.db.models import ApiKey, Project
-from app.security.api_keys import hash_api_key
-
+from app.security.api_keys import hash_api_key, hash_api_key_secret
 
 PROJECT_NAME = "local-project"
-RAW_API_KEY = "dev-local-key"
+ALPHABET = string.ascii_letters + string.digits
+
+
+def _random_token(length: int) -> str:
+    return "".join(secrets.choice(ALPHABET) for _ in range(length))
 
 
 with SessionLocal() as db:
@@ -26,11 +31,17 @@ with SessionLocal() as db:
         db.flush()
 
     existing = db.execute(select(ApiKey).where(ApiKey.project_id == project.id)).scalar_one_or_none()
+    raw_api_key = ""
     if existing is None:
+        key_id = _random_token(16)
+        secret = _random_token(40)
+        raw_api_key = f"{key_id}.{secret}"
         db.add(
             ApiKey(
                 project_id=project.id,
-                key_hash=hash_api_key(RAW_API_KEY),
+                key_id=key_id,
+                key_secret_hash=hash_api_key_secret(secret),
+                key_hash=hash_api_key(raw_api_key),
                 label="local-dev",
                 is_active=True,
             )
@@ -38,4 +49,7 @@ with SessionLocal() as db:
 
     db.commit()
     print(f"project_id={project.id}")
-    print(f"api_key={RAW_API_KEY}")
+    if raw_api_key:
+        print(f"api_key={raw_api_key}")
+    else:
+        print("api_key=<existing key unchanged>")
