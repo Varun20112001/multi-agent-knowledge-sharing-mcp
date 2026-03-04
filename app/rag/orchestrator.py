@@ -3,11 +3,10 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from app.agents.provider_router import (
-    LLMProvider,
     NonRetryableProviderError,
     NormalizedLLMResponse,
     ProviderError,
@@ -36,6 +35,20 @@ class MemoryService(Protocol):
         top_k: int,
     ) -> list[dict[str, object]]: ...
 
+
+class LLMExecutor(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    def execute(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        temperature: float = 0,
+        timeout_s: float | None = None,
+    ) -> NormalizedLLMResponse: ...
 
 @dataclass
 class ProviderAttemptTelemetry:
@@ -73,7 +86,7 @@ class RAGOrchestrator:
         *,
         retriever: Retriever,
         memory_service: MemoryService,
-        providers: dict[str, LLMProvider],
+        providers: dict[str, LLMExecutor],
         execution_config: ProviderExecutionConfig,
     ) -> None:
         self.retriever = retriever
@@ -123,7 +136,7 @@ class RAGOrchestrator:
 
     def _run_provider_with_retries(
         self,
-        provider: LLMProvider,
+        provider: LLMExecutor,
         messages: list[dict[str, str]],
         telemetry: list[ProviderAttemptTelemetry],
     ) -> NormalizedLLMResponse | None:
@@ -131,7 +144,7 @@ class RAGOrchestrator:
         for attempt in range(1, max_attempts + 1):
             start = time.perf_counter()
             try:
-                response = provider.generate(
+                response = provider.execute(
                     messages=messages,
                     timeout_s=self.execution_config.timeout_seconds,
                 )

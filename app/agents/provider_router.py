@@ -58,6 +58,23 @@ class LLMProvider(ABC):
     ) -> NormalizedLLMResponse:
         raise NotImplementedError
 
+    def execute(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+        temperature: float = 0,
+        timeout_s: float | None = None,
+    ) -> NormalizedLLMResponse:
+        return self.generate(
+            messages=messages,
+            tools=tools,
+            model=model,
+            temperature=temperature,
+            timeout_s=timeout_s,
+        )
+
 
 def _as_usage(usage: Any) -> LLMUsage:
     if usage is None:
@@ -204,3 +221,14 @@ def get_llm_provider(provider_name: str | None = None) -> LLMProvider:
     if provider == "local":
         return LocalLLMProvider()
     raise ValueError(f"Unsupported LLM provider: {provider}")
+
+
+__all__ = [
+    "LLMProvider",
+    "LLMUsage",
+    "NormalizedLLMResponse",
+    "ProviderError",
+    "RetryableProviderError",
+    "NonRetryableProviderError",
+    "get_llm_provider",
+]

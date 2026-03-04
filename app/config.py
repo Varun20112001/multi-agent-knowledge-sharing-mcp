@@ -12,6 +12,10 @@ class ProviderExecutionConfig(BaseModel):
     circuit_breaker_reset_seconds: int = 60
 
 
+class LLMExecutionConfig(BaseModel):
+    provider: ProviderExecutionConfig = Field(default_factory=ProviderExecutionConfig)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -55,6 +59,10 @@ class Settings(BaseSettings):
             circuit_breaker_failure_threshold=self.provider_cb_failure_threshold,
             circuit_breaker_reset_seconds=self.provider_cb_reset_seconds,
         )
+
+    @property
+    def llm_execution(self) -> LLMExecutionConfig:
+        return LLMExecutionConfig(provider=self.provider_execution)
 
     @property
     def resolved_database_url(self) -> str:
